@@ -1,10 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { fabric } from 'fabric';
 import { useSocket } from '../hooks/useSocket';
 import { Toolbar } from './Toolbar';
 import { UsernameDialog } from './UsernameDialog';
 import type { Tool, Cursor } from '../types';
+import { db } from '../lib/firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 export const Board: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
@@ -15,6 +17,8 @@ export const Board: React.FC = () => {
     const [cursors, setCursors] = useState<Cursor[]>([]);
     const [username, setUsername] = useState<string>(localStorage.getItem('username') || '');
     const [showUsernameDialog, setShowUsernameDialog] = useState(!localStorage.getItem('username'));
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -278,6 +282,110 @@ export const Board: React.FC = () => {
         };
     }, [activeTool, roomId, socket]);
 
+    // Save canvas to Firebase
+    const saveToFirebase = useCallback(async () => {
+        if (!fabricCanvas.current || !roomId) return;
+
+        try {
+            const canvas = fabricCanvas.current;
+            const canvasData = {
+                objects: canvas.toJSON(['id']).objects,
+                version: Date.now(),
+                lastModified: new Date().toISOString(),
+            };
+
+            await setDoc(doc(db, 'canvases', roomId), canvasData);
+            setLastSaved(new Date());
+            console.log('Canvas saved to Firebase');
+        } catch (error) {
+            console.error('Error saving to Firebase:', error);
+        }
+    }, [roomId]);
+
+    // Load canvas from Firebase
+    const loadFromFirebase = useCallback(async () => {
+        if (!fabricCanvas.current || !roomId) return;
+
+        try {
+            const docRef = doc(db, 'canvases', roomId);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const canvas = fabricCanvas.current;
+
+                canvas.clear();
+                if (data.objects && data.objects.length > 0) {
+                    fabric.util.enlivenObjects(data.objects, (objs: any[]) => {
+                        objs.forEach(o => canvas.add(o));
+                        canvas.renderAll();
+                    }, 'fabric');
+                }
+                console.log('Canvas loaded from Firebase');
+            }
+        } catch (error) {
+            console.error('Error loading from Firebase:', error);
+        }
+    }, [roomId]);
+
+    // Auto-save every 10 seconds
+    useEffect(() => {
+        if (!fabricCanvas.current || !roomId) return;
+
+        // Initial load from Firebase
+        loadFromFirebase();
+
+        // Setup auto-save
+        saveTimerRef.current = setInterval(() => {
+            saveToFirebase();
+        }, 10000); // 10 seconds
+
+        return () => {
+            if (saveTimerRef.current) {
+                clearInterval(saveTimerRef.current);
+            }
+        };
+    }, [roomId, loadFromFirebase, saveToFirebase]);
+
+    // Keyboard shortcut for save (Cmd+S / Ctrl+S)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+                e.preventDefault();
+                saveToFirebase();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [saveToFirebase]);
+
+    // Save when canvas changes
+    useEffect(() => {
+        if (!fabricCanvas.current) return;
+
+        const canvas = fabricCanvas.current;
+        const handleObjectChange = () => {
+            // Debounce save on changes
+            if (saveTimerRef.current) {
+                clearInterval(saveTimerRef.current);
+            }
+            saveTimerRef.current = setInterval(() => {
+                saveToFirebase();
+            }, 10000);
+        };
+
+        canvas.on('object:added', handleObjectChange);
+        canvas.on('object:modified', handleObjectChange);
+        canvas.on('object:removed', handleObjectChange);
+
+        return () => {
+            canvas.off('object:added', handleObjectChange);
+            canvas.off('object:modified', handleObjectChange);
+            canvas.off('object:removed', handleObjectChange);
+        };
+    }, [saveToFirebase]);
+
     const handleExport = () => {
         if (!fabricCanvas.current) return;
         const canvas = fabricCanvas.current;
@@ -333,6 +441,8 @@ export const Board: React.FC = () => {
                 activeTool={activeTool}
                 setActiveTool={setActiveTool}
                 onExport={handleExport}
+                onImageUpload={handleImageUpload}
+                onClear={handleClear}
             />
             <canvas ref={canvasRef} />
 

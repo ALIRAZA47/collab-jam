@@ -59,7 +59,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, onE
                     ))}
 
                     <div className="h-px bg-border my-1"></div>
-                    {/* 
+
                     <button
                         className="w-12 h-12 rounded-xl flex items-center justify-center transition-all text-foreground hover:bg-accent"
                         onClick={onImageUpload}
@@ -76,7 +76,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, onE
                         <Trash2 className="w-5 h-5" />
                     </button>
 
-                    <div className="h-px bg-border my-1"></div> */}
+                    <div className="h-px bg-border my-1"></div>
 
                     <button
                         className="w-12 h-12 rounded-xl flex items-center justify-center text-foreground hover:bg-accent transition-all"
