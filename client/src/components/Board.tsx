@@ -3,8 +3,6 @@ import { useParams } from 'react-router-dom';
 import { fabric } from 'fabric';
 import { useSocket } from '../hooks/useSocket';
 import { Toolbar } from './Toolbar';
-import { NotesPanel } from './NotesPanel';
-import { NoteMarker } from './NoteMarker';
 import { UsernameDialog } from './UsernameDialog';
 import type { Tool, Cursor } from '../types';
 
@@ -15,10 +13,8 @@ export const Board: React.FC = () => {
     const fabricCanvas = useRef<fabric.Canvas | null>(null);
     const [activeTool, setActiveTool] = useState<Tool>('select');
     const [cursors, setCursors] = useState<Cursor[]>([]);
-    const [notes, setNotes] = useState<{ id: string, x: number, y: number, text: string, author?: string, timestamp?: number }[]>([]);
     const [username, setUsername] = useState<string>(localStorage.getItem('username') || '');
     const [showUsernameDialog, setShowUsernameDialog] = useState(!localStorage.getItem('username'));
-    const [notesPanelOpen, setNotesPanelOpen] = useState(false);
 
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -43,18 +39,13 @@ export const Board: React.FC = () => {
         if (socket && roomId) {
             socket.emit('join-room', roomId);
 
-            socket.on('server-state', (state: { fabricObjects: any[], notes: any[] }) => {
+            socket.on('server-state', (state: { fabricObjects: any[] }) => {
                 // Load fabric objects
                 if (state.fabricObjects && state.fabricObjects.length > 0) {
                     fabric.util.enlivenObjects(state.fabricObjects, (objs: any[]) => {
                         objs.forEach(o => canvas.add(o));
                         canvas.renderAll();
                     }, 'fabric');
-                }
-
-                // Load notes
-                if (state.notes && state.notes.length > 0) {
-                    setNotes(state.notes);
                 }
             });
 
@@ -78,14 +69,6 @@ export const Board: React.FC = () => {
                         });
                         canvas.renderAll();
                     }
-                } else if (data.action === 'add-note') {
-                    setNotes(prev => {
-                        const exists = prev.find(n => n.id === data.object.id);
-                        if (exists) {
-                            return prev.map(n => n.id === data.object.id ? data.object : n);
-                        }
-                        return [...prev, data.object];
-                    });
                 }
             });
 
@@ -133,31 +116,21 @@ export const Board: React.FC = () => {
         if (!fabricCanvas.current) return;
         const canvas = fabricCanvas.current;
 
+        // Handle drawing and eraser modes
         canvas.isDrawingMode = activeTool === 'pencil';
         if (activeTool === 'pencil') {
             canvas.freeDrawingBrush.width = 3;
             canvas.freeDrawingBrush.color = '#000000';
+        } else if (activeTool === 'eraser') {
+            canvas.isDrawingMode = true;
+            canvas.freeDrawingBrush.width = 20;
+            canvas.freeDrawingBrush.color = '#ffffff'; // White to erase on white canvas
         } else {
             canvas.off('mouse:down');
             canvas.on('mouse:down', (o) => {
-                if (activeTool === 'select' || activeTool === 'pencil') return;
+                if (activeTool === 'select') return;
 
                 const pointer = canvas.getPointer(o.e);
-
-                if (activeTool === 'note') {
-                    const id = Math.random().toString(36).substr(2, 9);
-                    const newNote = {
-                        id,
-                        x: pointer.x,
-                        y: pointer.y,
-                        text: '',
-                        author: username || 'Anonymous',
-                        timestamp: Date.now()
-                    };
-                    setNotes(prev => [...prev, newNote]);
-                    setActiveTool('select');
-                    return;
-                }
 
                 let object: any;
                 const id = Math.random().toString(36).substr(2, 9);
@@ -182,6 +155,41 @@ export const Board: React.FC = () => {
                         fill: 'transparent',
                         stroke: '#1a73e8',
                         strokeWidth: 3,
+                    });
+                } else if (activeTool === 'triangle') {
+                    object = new fabric.Triangle({
+                        left: pointer.x,
+                        top: pointer.y,
+                        width: 100,
+                        height: 100,
+                        fill: 'transparent',
+                        stroke: '#1a73e8',
+                        strokeWidth: 3,
+                    });
+                } else if (activeTool === 'line') {
+                    object = new fabric.Line([pointer.x, pointer.y, pointer.x + 150, pointer.y], {
+                        stroke: '#1a73e8',
+                        strokeWidth: 3,
+                    });
+                } else if (activeTool === 'arrow') {
+                    // Create arrow using line and triangle
+                    const line = new fabric.Line([pointer.x, pointer.y, pointer.x + 150, pointer.y], {
+                        stroke: '#1a73e8',
+                        strokeWidth: 3,
+                    });
+                    const triangle = new fabric.Triangle({
+                        left: pointer.x + 150,
+                        top: pointer.y,
+                        width: 15,
+                        height: 15,
+                        fill: '#1a73e8',
+                        angle: 90,
+                        originX: 'center',
+                        originY: 'center',
+                    });
+                    object = new fabric.Group([line, triangle], {
+                        left: pointer.x,
+                        top: pointer.y,
                     });
                 } else if (activeTool === 'text') {
                     object = new fabric.IText('Type here', {
@@ -222,54 +230,9 @@ export const Board: React.FC = () => {
                 activeTool={activeTool}
                 setActiveTool={setActiveTool}
                 onExport={handleExport}
-                onToggleNotes={() => setNotesPanelOpen(!notesPanelOpen)}
-                notesPanelOpen={notesPanelOpen}
             />
             <canvas ref={canvasRef} />
 
-            {notesPanelOpen && (
-                <NotesPanel
-                    notes={notes}
-                    username={username}
-                    onAddNote={(text) => {
-                        // Find the last note with empty text or create a new one
-                        const emptyNote = notes.find(n => !n.text);
-                        if (emptyNote) {
-                            const updated = { ...emptyNote, text, author: username };
-                            setNotes(prev => prev.map(n => n.id === emptyNote.id ? updated : n));
-                            socket?.emit('draw-action', { roomId, action: 'add-note', object: updated });
-                        } else {
-                            // Create a centered note if no marker exists
-                            const newNote = {
-                                id: Math.random().toString(36).substr(2, 9),
-                                x: window.innerWidth / 2,
-                                y: window.innerHeight / 2,
-                                text,
-                                author: username,
-                                timestamp: Date.now()
-                            };
-                            setNotes(prev => [...prev, newNote]);
-                            socket?.emit('draw-action', { roomId, action: 'add-note', object: newNote });
-                        }
-                    }}
-                    onClose={() => setNotesPanelOpen(false)}
-                />
-            )}
-
-            {notes.map((note, index) => (
-                <NoteMarker
-                    key={note.id}
-                    id={note.id}
-                    x={note.x}
-                    y={note.y}
-                    index={index + 1}
-                    onMove={(x, y) => {
-                        const updated = { ...note, x, y };
-                        setNotes(prev => prev.map(n => n.id === note.id ? updated : n));
-                        socket?.emit('draw-action', { roomId, action: 'add-note', object: updated });
-                    }}
-                />
-            ))}
             <UsernameDialog
                 open={showUsernameDialog}
                 onSubmit={(name) => {

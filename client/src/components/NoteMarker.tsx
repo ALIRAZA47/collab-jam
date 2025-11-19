@@ -45,7 +45,7 @@ export const NoteMarker: React.FC<NoteMarkerProps> = ({ id, x, y, index, onMove 
 
     return (
         <div
-            className="absolute transform -translate-x-1/2 -translate-y-1/2 z-30 group"
+            className="absolute transform -translate-x-1/2 -translate-y-1/2 z-40 group"
             style={{
                 left: x,
                 top: y,
