@@ -32,7 +32,7 @@ In your Vercel project settings, add the following environment variables:
 
 Navigate to: **Project Settings → Environment Variables**
 
-Add these variables:
+Add these variables (available to all environments: Production, Preview, Development):
 
 ```
 VITE_FIREBASE_API_KEY=your_api_key
@@ -45,26 +45,23 @@ VITE_FIREBASE_APP_ID=your_app_id
 
 > **Note:** Get these values from your Firebase Console → Project Settings → General
 
-#### Backend Environment Variables
+### 4. Configure Build Settings (Important!)
 
-```
-NODE_ENV=production
-PORT=3002
-```
+In Vercel Dashboard, go to **Project Settings → General** and configure:
 
-### 4. Deploy via CLI (Alternative)
+- **Framework Preset:** Other
+- **Root Directory:** Leave empty (uses root)
+- **Build Command:** `npm run build` (or leave default)
+- **Output Directory:** `client/dist`
+- **Install Command:** `npm install --prefix client && npm install --prefix server`
 
-If using the Vercel CLI:
+### 5. Redeploy
 
-```bash
-# Login to Vercel
-vercel login
-
-# Deploy to production
-vercel --prod
-```
-
-### 5. Set up Custom Domain (Optional)
+After updating configuration:
+1. Go to **Deployments** tab
+2. Click the three dots on the latest deployment
+3. Select **Redeploy**
+4. Or push a new commit to trigger deployment
 
 1. Go to **Project Settings → Domains**
 2. Add your custom domain
