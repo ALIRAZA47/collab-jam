@@ -122,7 +122,7 @@ export const Board: React.FC = () => {
             socket?.off('draw-action');
             socket?.off('cursor-move');
         };
-    }, [socket, roomId]);
+    }, [socket, roomId, username]);
 
     useEffect(() => {
         if (!fabricCanvas.current) return;
@@ -450,8 +450,8 @@ export const Board: React.FC = () => {
                 open={showUsernameDialog}
                 onSubmit={(name) => {
                     setUsername(name);
-                    setShowUsernameDialog(false);
                     localStorage.setItem('username', name);
+                    setShowUsernameDialog(false);
                 }}
             />
 
