@@ -56,8 +56,20 @@ export const setupSocket = (io: Server) => {
             rooms.set(roomId, roomState);
         });
 
-        socket.on('cursor-move', (data: any) => {
-            socket.to(data.roomId).emit('cursor-move', { ...data, userId: socket.id });
+        socket.on('cursor-move', (data: { roomId: string, x: number, y: number, color: string, username?: string }) => {
+            const { roomId, ...cursorData } = data;
+            socket.to(roomId).emit('cursor-move', { ...cursorData, userId: socket.id });
+        });
+
+        socket.on('clear-canvas', (data: { roomId: string }) => {
+            const { roomId } = data;
+            const roomState = rooms.get(roomId);
+            if (roomState) {
+                roomState.fabricObjects = [];
+                roomState.notes = [];
+                rooms.set(roomId, roomState);
+            }
+            socket.to(roomId).emit('clear-canvas');
         });
 
         socket.on('disconnect', () => {

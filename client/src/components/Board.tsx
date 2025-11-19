@@ -72,6 +72,14 @@ export const Board: React.FC = () => {
                 }
             });
 
+            socket.on('clear-canvas', () => {
+                if (fabricCanvas.current) {
+                    fabricCanvas.current.clear();
+                    fabricCanvas.current.backgroundColor = '#ffffff';
+                    fabricCanvas.current.renderAll();
+                }
+            });
+
             socket.on('cursor-move', (data: Cursor) => {
                 setCursors(prev => {
                     const filtered = prev.filter(c => c.userId !== data.userId);
@@ -191,6 +199,61 @@ export const Board: React.FC = () => {
                         left: pointer.x,
                         top: pointer.y,
                     });
+                } else if (activeTool === 'star') {
+                    // Create a star shape using polygon
+                    const points = [];
+                    const outerRadius = 50;
+                    const innerRadius = 25;
+                    const spikes = 5;
+                    for (let i = 0; i < spikes * 2; i++) {
+                        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                        const angle = (i * Math.PI) / spikes;
+                        points.push({
+                            x: radius * Math.sin(angle),
+                            y: -radius * Math.cos(angle)
+                        });
+                    }
+                    object = new fabric.Polygon(points, {
+                        left: pointer.x,
+                        top: pointer.y,
+                        fill: 'transparent',
+                        stroke: '#1a73e8',
+                        strokeWidth: 3,
+                    });
+                } else if (activeTool === 'diamond') {
+                    // Create diamond using polygon
+                    const size = 60;
+                    const points = [
+                        { x: 0, y: -size },
+                        { x: size, y: 0 },
+                        { x: 0, y: size },
+                        { x: -size, y: 0 }
+                    ];
+                    object = new fabric.Polygon(points, {
+                        left: pointer.x,
+                        top: pointer.y,
+                        fill: 'transparent',
+                        stroke: '#1a73e8',
+                        strokeWidth: 3,
+                    });
+                } else if (activeTool === 'hexagon') {
+                    // Create hexagon using polygon
+                    const points = [];
+                    const radius = 50;
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i * Math.PI) / 3;
+                        points.push({
+                            x: radius * Math.cos(angle),
+                            y: radius * Math.sin(angle)
+                        });
+                    }
+                    object = new fabric.Polygon(points, {
+                        left: pointer.x,
+                        top: pointer.y,
+                        fill: 'transparent',
+                        stroke: '#1a73e8',
+                        strokeWidth: 3,
+                    });
                 } else if (activeTool === 'text') {
                     object = new fabric.IText('Type here', {
                         left: pointer.x,
@@ -217,11 +280,51 @@ export const Board: React.FC = () => {
 
     const handleExport = () => {
         if (!fabricCanvas.current) return;
-        const url = fabricCanvas.current.toDataURL({ format: 'png' });
+        const canvas = fabricCanvas.current;
         const link = document.createElement('a');
-        link.href = url;
+        link.href = canvas.toDataURL({ format: 'png', quality: 1 });
         link.download = `jam-${roomId}.png`;
         link.click();
+    };
+
+    const handleImageUpload = () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e: any) => {
+            const file = e.target.files[0];
+            if (file && fabricCanvas.current) {
+                const reader = new FileReader();
+                reader.onload = (event: any) => {
+                    fabric.Image.fromURL(event.target.result, (img) => {
+                        if (!fabricCanvas.current) return;
+                        img.scale(0.5);
+                        img.set({ left: 100, top: 100 });
+                        const id = Math.random().toString(36).substr(2, 9);
+                        img.set({ id });
+                        fabricCanvas.current.add(img);
+                        socket?.emit('draw-action', {
+                            roomId,
+                            action: 'add',
+                            object: img.toJSON(['id'])
+                        });
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+        input.click();
+    };
+
+    const handleClear = () => {
+        if (!fabricCanvas.current) return;
+        if (window.confirm('Are you sure you want to clear the entire canvas? This cannot be undone.')) {
+            fabricCanvas.current.clear();
+            fabricCanvas.current.backgroundColor = '#ffffff';
+            fabricCanvas.current.renderAll();
+            // Notify other users to clear their canvas
+            socket?.emit('clear-canvas', { roomId });
+        }
     };
 
     return (
