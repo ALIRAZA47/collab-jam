@@ -10,10 +10,17 @@ export const Home: React.FC = () => {
         navigate(`/${roomId}`);
     };
 
+    React.useEffect(() => {
+        document.title = "Collab Jam - Real-time Collaborative Whiteboard";
+    }, []);
+
     return (
         <div className="flex items-center justify-center h-screen bg-gradient-to-br from-blue-50 to-white">
             <div className="text-center p-12 max-w-2xl">
                 <div className="mb-8">
+                    <div className="flex justify-center mb-6">
+                        <img src="/logo.png" alt="Collab Jam Logo" className="w-24 h-24 rounded-2xl shadow-lg" />
+                    </div>
                     <h1 className="text-6xl font-bold mb-4 text-gray-900">
                         Collab Jam
                     </h1>

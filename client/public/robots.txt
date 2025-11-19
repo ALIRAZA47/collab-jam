@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /socket.io/
+
+Sitemap: https://collab-jam.vercel.app/sitemap.xml

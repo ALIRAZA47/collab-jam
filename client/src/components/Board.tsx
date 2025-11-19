@@ -21,6 +21,15 @@ export const Board: React.FC = () => {
     const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
+        if (roomId) {
+            document.title = `Jam Session ${roomId.slice(0, 8)}... - Collab Jam`;
+        }
+        return () => {
+            document.title = "Collab Jam - Real-time Collaborative Whiteboard";
+        };
+    }, [roomId]);
+
+    useEffect(() => {
         if (!canvasRef.current) return;
 
         const canvas = new fabric.Canvas(canvasRef.current, {
@@ -444,6 +453,13 @@ export const Board: React.FC = () => {
                 onImageUpload={handleImageUpload}
                 onClear={handleClear}
             />
+
+            {/* Logo */}
+            <a href="/" className="fixed top-4 left-20 z-50 flex items-center gap-2 bg-white/90 backdrop-blur p-2 rounded-xl shadow-sm border border-border hover:bg-white transition-colors text-decoration-none">
+                <img src="/logo.png" alt="Collab Jam" className="w-8 h-8 rounded-lg" />
+                <span className="font-bold text-gray-700 hidden sm:block">Collab Jam</span>
+            </a>
+
             <canvas ref={canvasRef} />
 
             <UsernameDialog
