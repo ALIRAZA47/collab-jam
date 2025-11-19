@@ -404,7 +404,7 @@ export const Board: React.FC = () => {
             if (file && fabricCanvas.current) {
                 const reader = new FileReader();
                 reader.onload = (event: any) => {
-                    fabric.Image.fromURL(event.target.result, (img) => {
+                    fabric.Image.fromURL(event.target.result, (img: any) => {
                         if (!fabricCanvas.current) return;
                         img.scale(0.5);
                         img.set({ left: 100, top: 100 });
